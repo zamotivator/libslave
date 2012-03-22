@@ -94,24 +94,20 @@ struct ExtStateIface {
     virtual unsigned long getMasterLogPos() = 0;
     virtual std::string getMasterLogName() = 0;
 
-    // Сохраняет master info в persistent хранилище, например, файл или БД.
-    // В случае какой-нибудь ошибки, будет пытаться сохранить master info до
-    // тех пор, пока не удастся это сделать.
+    // Saves master info into persistent storage, i.e. file or database.
+    // In case of error will try to save master info until success.
     virtual void saveMasterInfo() = 0;
 
-    // Функция читает master info из persistent хранилища.
-    // Если master info не был ранее сохранён (например, первый запуск демона),
-    // то библиотека читает бинлоги с текущей позиции.
-    // Функция возвращает true, если считана сохранённая позиция, и false - если
-    // нет сохранённой позиции (в этом случае функция обнуляет позицию и очищает
-    // имя лог-файла).
-    // В случае какой-нибудь ошибки чтения из хранилища, функция будет пытаться
-    // прочитать снова, пока не сможет прочитать сохранённую позицию или выяснить
-    // её отсутствие.
+    // Reads master info from persistent storage.
+    // If master info was not saved earlier (for i.e. it is the first daemon start),
+    // position is cleared (pos = 0, name = ""). In such case library reads binlogs
+    // from the current position.
+    // Returns true if saved position was read, false otherwise.
+    // In case of read error function will retry to read until success which means
+    // known position or known absence of saved position.
     virtual bool loadMasterInfo(std::string& logname, unsigned long& pos) = 0;
 
-    // Работает так же, как loadMasterInfo(), только записывает в pos последнюю
-    // текущую позицию внутри транзакции, если такая есть.
+    // Works like loadMasterInfo() but writes last position inside transaction if presented.
     bool getMasterInfo(std::string& logname, unsigned long& pos)
     {
         unsigned long in_trans_pos = getIntransactionPos();
@@ -127,15 +123,14 @@ struct ExtStateIface {
     virtual unsigned int getConnectCount() = 0;
     virtual void setStateProcessing(bool _state) = 0;
     virtual bool getStateProcessing() = 0;
-    // Стандартного формата для статистики распределения событий по таблицам нет,
-    // поэтому нет функций получения этой статистики.
+    // There is no standard format for events distribution in the tables,
+    // so there is no function for getting this statistics.
     virtual void initTableCount(const std::string& t) = 0;
     virtual void incTableCount(const std::string& t) = 0;
 };
 
 
-// Объект-заглушка для ответы на запросы статы через StateHolder, когда libslave
-// ещё не проинициализирован
+// Stub object for answers on stats requests through StateHolder while libslave is not initialized yet.
 struct EmptyExtState: public ExtStateIface, protected State {
     ~EmptyExtState() {}
     virtual State getState() { return *this; }
@@ -159,7 +154,8 @@ struct EmptyExtState: public ExtStateIface, protected State {
     virtual void incTableCount(const std::string& t) {}
 };
 
-// Предназначен для хранения в синглтоне ExtStateIface или его потомка
+// Saves ExtStateIface or it's descendants.
+// Used in singleton.
 struct StateHolder {
     typedef boost::shared_ptr<ExtStateIface> PExtState;
     PExtState ext_state;

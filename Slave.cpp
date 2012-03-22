@@ -369,13 +369,13 @@ void Slave::get_remote_binlog( const boost::function< bool() >& _interruptFlag)
 
 connected:
 
-    // Получим позицию бинлога, сохранённую в ext_state ранее, или загрузим её
-    // из persistent хранилища. false в случае, если не удалось получить позицию.
+    // РџРѕР»СѓС‡РёРј РїРѕР·РёС†РёСЋ Р±РёРЅР»РѕРіР°, СЃРѕС…СЂР°РЅС‘РЅРЅСѓСЋ РІ ext_state СЂР°РЅРµРµ, РёР»Рё Р·Р°РіСЂСѓР·РёРј РµС‘
+    // РёР· persistent С…СЂР°РЅРёР»РёС‰Р°. false РІ СЃР»СѓС‡Р°Рµ, РµСЃР»Рё РЅРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ РїРѕР·РёС†РёСЋ.
     if( !ext_state.getMasterInfo(
                 m_master_info.master_log_name,
                 m_master_info.master_log_pos) ) {
-        // Если сохранённой ранее позиции бинлога нет,
-        // получаем последнюю версию бинлога и смещение
+        // Р•СЃР»Рё СЃРѕС…СЂР°РЅС‘РЅРЅРѕР№ СЂР°РЅРµРµ РїРѕР·РёС†РёРё Р±РёРЅР»РѕРіР° РЅРµС‚,
+        // РїРѕР»СѓС‡Р°РµРј РїРѕСЃР»РµРґРЅСЋСЋ РІРµСЂСЃРёСЋ Р±РёРЅР»РѕРіР° Рё СЃРјРµС‰РµРЅРёРµ
         std::pair<std::string,unsigned int> row = getLastBinlog();
 
         m_master_info.master_log_name = row.first;
@@ -416,10 +416,10 @@ connected:
                                   "slave. If the entry is correct, restart the server with a higher value of "
                                   "max_allowed_packet. max_allowed_packet=" << mysql_error(&mysql) );
                         break;
-                    case ER_MASTER_FATAL_ERROR_READING_BINLOG: // Ошибка -- неизвестный бинлог-файл.
+                    case ER_MASTER_FATAL_ERROR_READING_BINLOG: // РћС€РёР±РєР° -- РЅРµРёР·РІРµСЃС‚РЅС‹Р№ Р±РёРЅР»РѕРі-С„Р°Р№Р».
                         LOG_ERROR(log, "Myslave: fatal error reading binlog. " <<  mysql_error(&mysql) );
                         break;
-                    case 2013: // Обработка ошибки 'Lost connection to MySQL'
+                    case 2013: // РћР±СЂР°Р±РѕС‚РєР° РѕС€РёР±РєРё 'Lost connection to MySQL'
                         LOG_WARNING(log, "Myslave: Error from MySQL: " << mysql_error(&mysql) );
                         break;
                     default:
