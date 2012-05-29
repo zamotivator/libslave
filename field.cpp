@@ -466,12 +466,12 @@ Field_bit::Field_bit(const std::string& field_name_arg, const std::string& type)
 
 const char* Field_bit::unpack(const char *from)
 {
-    uint64 value = 0;
-
+    uint64 value = 0ULL;
+    
     for (const char *b = from, *e = from + _pack_length; b < e; ++b)
     {
-        value <<= 8U;
-        value |= *b;
+        value <<= 8;
+        value |= *(const uint8*)b;
     }
 
     LOG_TRACE(log, "  bit: 0x" << std::hex << value);
