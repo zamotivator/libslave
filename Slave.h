@@ -13,9 +13,9 @@
 */
 
 /*
- * 
+ *
  * Guaranteed to work with MySQL5.1.23
- * 
+ *
  */
 
 #ifndef __SLAVE_SLAVE_H_
@@ -67,10 +67,10 @@ private:
     void createDatabaseStructure_(table_order_t& tabs, RelayLogInfo& rli) const;
 
 public:
-	
+
     Slave(ExtStateIface &state) : ext_state(state) {}
 
-    Slave(MasterInfo& _master_info, ExtStateIface &state) : m_master_info(_master_info), ext_state(state) {}
+    Slave(const MasterInfo& _master_info, ExtStateIface &state) : m_master_info(_master_info), ext_state(state) {}
 
     void setMasterInfo(const MasterInfo& aMasterInfo) { m_master_info = aMasterInfo; }
     const MasterInfo& masterInfo() const { return m_master_info; }

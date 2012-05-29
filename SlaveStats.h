@@ -27,6 +27,8 @@
  */
 
 
+#include <boost/shared_ptr.hpp>
+#include <string>
 #include <sys/time.h>
 
 
@@ -127,12 +129,13 @@ struct ExtStateIface {
     // so there is no function for getting this statistics.
     virtual void initTableCount(const std::string& t) = 0;
     virtual void incTableCount(const std::string& t) = 0;
+
+    virtual ~ExtStateIface() {}
 };
 
 
 // Stub object for answers on stats requests through StateHolder while libslave is not initialized yet.
 struct EmptyExtState: public ExtStateIface, protected State {
-    ~EmptyExtState() {}
     virtual State getState() { return *this; }
     virtual void setConnecting() {}
     virtual time_t getConnectTime() { return 0; }

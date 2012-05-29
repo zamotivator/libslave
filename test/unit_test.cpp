@@ -10,6 +10,7 @@ using namespace boost::unit_test;
 #include <boost/mpl/int.hpp>
 #include <boost/mpl/list.hpp>
 #include <boost/thread.hpp>
+#include <fstream>
 #include <cfloat>
 #include "Slave.h"
 #include "nanomysql.h"
@@ -167,7 +168,7 @@ namespace
             sMasterInfo.user = cfg.mysql_user;
             sMasterInfo.password = cfg.mysql_pass;
 
-            m_Slave = slave::Slave(sMasterInfo);
+            m_Slave.setMasterInfo(sMasterInfo);
             // Ставим колбек из фиксчи - а он будет вызывать колбеки, которые ему будут ставить в тестах
             m_Slave.setCallback(cfg.mysql_db, "test", boost::ref(m_Callback));
             m_Slave.init();

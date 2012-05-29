@@ -7,7 +7,7 @@
 
 
 std::string print(const std::string& type, const boost::any& v) {
-    
+
     if (v.type() == typeid(std::string)) {
 
         std::string r = "'";
@@ -18,7 +18,7 @@ std::string print(const std::string& type, const boost::any& v) {
     } else {
         std::ostringstream s;
 
-        if (v.type() == typeid(int)) 
+        if (v.type() == typeid(int))
             s << boost::any_cast<int>(v);
 
         else if (v.type() == typeid(unsigned int))
@@ -50,7 +50,7 @@ void callback(const slave::RecordSet& event) {
     default: break;
     }
 
-    std::cout << " " << event.db_name << "." << event.tbl_name << "\n"; 
+    std::cout << " " << event.db_name << "." << event.tbl_name << "\n";
 
     for (slave::Row::const_iterator i = event.m_row.begin(); i != event.m_row.end(); ++i) {
 
@@ -64,10 +64,10 @@ void callback(const slave::RecordSet& event) {
 
             std::string old_value("NULL");
 
-            if (j != event.m_old_row.end()) 
+            if (j != event.m_old_row.end())
                 old_value = print(i->second.first, j->second.second);
 
-            if (value != old_value) 
+            if (value != old_value)
                 std::cout << "    (was: " << old_value << ")";
         }
 
@@ -83,6 +83,11 @@ void xid_callback(unsigned int server_id) {
     std::cout << "COMMIT @server_id = " << server_id << "\n\n";
 }
 
+void usage(int argc, char** argv)
+{
+    std::cout << "Usage: " << argv[0] << " -h <mysql host> -u <mysql user> -p <mysql password> -d <mysql database> "
+              << "<table name> <table name> ..." << std::endl;
+}
 
 int main(int argc, char** argv) {
 
@@ -95,7 +100,7 @@ int main(int argc, char** argv) {
     while (1) {
         int c = ::getopt(argc, argv, "h:u:p:P:d:");
 
-        if (c == -1) 
+        if (c == -1)
             break;
 
         switch (c) {
@@ -119,15 +124,13 @@ int main(int argc, char** argv) {
             break;
 
         default:
-            std::cout << "Usage: libslave_test -h <mysql host> -u <mysql user> -p <mysql password> -d <mysql database> "
-                      << "<table name> <table name> ..." << std::endl;
+            usage(argc, argv);
             return 1;
         }
     }
 
-    if (host.empty() || user.empty() || database.empty() || password.empty()) {
-        std::cout << "Usage: libslave_test -h <mysql host> -u <mysql user> -p <mysql password> -d <mysql database> "
-                  << "<table name> <table name> ..." << std::endl;
+    if (host.empty() || user.empty() || database.empty()) {
+        usage(argc, argv);
         return 1;
     }
 
@@ -148,12 +151,10 @@ int main(int argc, char** argv) {
     masterinfo.user = user;
     masterinfo.password = password;
 
-    masterinfo.master_info_file = "libslave.master_info";
-
     try {
 
         std::cout << "Creating client, setting callbacks..." << std::endl;
-    
+
         slave::Slave slave(masterinfo);
 
         for (std::vector<std::string>::const_iterator i = tables.begin(); i != tables.end(); ++i) {
@@ -170,7 +171,7 @@ int main(int argc, char** argv) {
 
         while (1) {
             try {
-                
+
                 std::cout << "Reading binlogs..." << std::endl;
                 slave.get_remote_binlog();
 
@@ -182,6 +183,6 @@ int main(int argc, char** argv) {
     } catch (std::exception& ex) {
         std::cout << "Error in initializing slave: " << ex.what() << std::endl;
     }
-    
+
     return 0;
 }
