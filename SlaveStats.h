@@ -135,8 +135,8 @@ struct ExtStateIface {
 
 
 // Stub object for answers on stats requests through StateHolder while libslave is not initialized yet.
-struct EmptyExtState: public ExtStateIface, protected State {
-    virtual State getState() { return *this; }
+struct EmptyExtState: public ExtStateIface {
+    virtual State getState() { return State(); }
     virtual void setConnecting() {}
     virtual time_t getConnectTime() { return 0; }
     virtual void setLastFilteredUpdateTime() {}
@@ -149,7 +149,7 @@ struct EmptyExtState: public ExtStateIface, protected State {
     virtual unsigned long getMasterLogPos() { return 0; }
     virtual std::string getMasterLogName() { return ""; }
     virtual void saveMasterInfo() {}
-    virtual bool loadMasterInfo(std::string& logname, unsigned long& pos) { while(true); return false; }
+    virtual bool loadMasterInfo(std::string& logname, unsigned long& pos) { return false; }
     virtual unsigned int getConnectCount() { return 0; }
     virtual void setStateProcessing(bool _state) {}
     virtual bool getStateProcessing() { return false; }

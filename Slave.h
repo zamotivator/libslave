@@ -26,6 +26,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <memory>
 
 #include <mysql/mysql.h>
 
@@ -53,6 +54,7 @@ private:
     int m_server_id;
 
     MasterInfo m_master_info;
+    EmptyExtState empty_ext_state;
     ExtStateIface &ext_state;
 
     table_order_t m_table_order;
@@ -68,8 +70,9 @@ private:
 
 public:
 
+    Slave() : ext_state(empty_ext_state) {}
     Slave(ExtStateIface &state) : ext_state(state) {}
-
+    Slave(const MasterInfo& _master_info) : m_master_info(_master_info), ext_state(empty_ext_state) {}
     Slave(const MasterInfo& _master_info, ExtStateIface &state) : m_master_info(_master_info), ext_state(state) {}
 
     void setMasterInfo(const MasterInfo& aMasterInfo) { m_master_info = aMasterInfo; }
