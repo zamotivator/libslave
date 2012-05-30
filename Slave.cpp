@@ -421,6 +421,12 @@ connected:
                         break;
                     case 2013: // Обработка ошибки 'Lost connection to MySQL'
                         LOG_WARNING(log, "Myslave: Error from MySQL: " << mysql_error(&mysql) );
+                        // Check if connection closed by user for exiting from the loop
+                        if (_interruptFlag())
+                        {
+                            LOG_INFO(log, "Interrupt flag is true, breaking loop");
+                            continue;
+                        }
                         break;
                     default:
                         LOG_ERROR(log, "Myslave: Error reading packet from server: " << mysql_error(&mysql)
@@ -545,7 +551,7 @@ std::map<std::string,std::string> Slave::getRowType(const std::string& db_name,
             LOG_ERROR(log, "WARNING: Broken SHOW TABLE STATUS FROM " << db_name);
             continue;
         }
-        
+
         //row[0] - the table name
         //row[3] - row_format
 
@@ -769,7 +775,7 @@ int Slave::process_event(const slave::Basic_event_info& bei, RelayLogInfo &m_rli
 
     case QUERY_EVENT:
     {
-        // Check for an ALTER TABLE 
+        // Check for an ALTER TABLE
 
         slave::Query_event_info qei(bei.buf, bei.event_len);
 
