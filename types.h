@@ -10,6 +10,8 @@ namespace types
 {
     typedef uint32_t            MY_INT;
     typedef unsigned long long  MY_BIGINT;
+    typedef uint32_t            MY_MEDIUMINT;
+    typedef uint16_t            MY_SMALLINT;
     typedef char                MY_TINYINT;
     typedef uint64_t            MY_BIT;
     typedef int                 MY_ENUM;
