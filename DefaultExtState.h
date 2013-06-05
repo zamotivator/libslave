@@ -61,6 +61,7 @@ public:
     {
         boost::mutex::scoped_lock lock(m_mutex);
         master_log_name = log_name; master_log_pos = pos;
+        intransaction_pos = pos;
     }
     virtual unsigned long getMasterLogPos()
     {
@@ -76,6 +77,8 @@ public:
     virtual bool loadMasterInfo(std::string& logname, unsigned long& pos)
     {
         boost::mutex::scoped_lock lock(m_mutex);
+        logname.clear();
+        pos = 0;
         return false;
     }
     virtual unsigned int getConnectCount()
