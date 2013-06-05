@@ -136,25 +136,32 @@ struct ExtStateIface {
 
 // Stub object for answers on stats requests through StateHolder while libslave is not initialized yet.
 struct EmptyExtState: public ExtStateIface {
+    EmptyExtState() : master_log_pos(0), intransaction_pos(0) {}
+
     virtual State getState() { return State(); }
     virtual void setConnecting() {}
     virtual time_t getConnectTime() { return 0; }
     virtual void setLastFilteredUpdateTime() {}
     virtual time_t getLastFilteredUpdateTime() { return 0; }
-    virtual void setLastEventTimePos(time_t t, unsigned long pos) {}
+    virtual void setLastEventTimePos(time_t t, unsigned long pos) { intransaction_pos = pos; }
     virtual time_t getLastUpdateTime() { return 0; }
     virtual time_t getLastEventTime() { return 0; }
-    virtual unsigned long getIntransactionPos() { return 0; }
-    virtual void setMasterLogNamePos(const std::string& log_name, unsigned long pos) {}
-    virtual unsigned long getMasterLogPos() { return 0; }
-    virtual std::string getMasterLogName() { return ""; }
+    virtual unsigned long getIntransactionPos() { return intransaction_pos; }
+    virtual void setMasterLogNamePos(const std::string& log_name, unsigned long pos) { master_log_name = log_name; master_log_pos = intransaction_pos = pos;}
+    virtual unsigned long getMasterLogPos() { return master_log_pos; }
+    virtual std::string getMasterLogName() { return master_log_name; }
     virtual void saveMasterInfo() {}
-    virtual bool loadMasterInfo(std::string& logname, unsigned long& pos) { return false; }
+    virtual bool loadMasterInfo(std::string& logname, unsigned long& pos) { logname.clear(); pos = 0; return false; }
     virtual unsigned int getConnectCount() { return 0; }
     virtual void setStateProcessing(bool _state) {}
     virtual bool getStateProcessing() { return false; }
     virtual void initTableCount(const std::string& t) {}
     virtual void incTableCount(const std::string& t) {}
+
+private:
+    std::string     master_log_name;
+    unsigned long   master_log_pos;
+    unsigned long   intransaction_pos;
 };
 
 // Saves ExtStateIface or it's descendants.
