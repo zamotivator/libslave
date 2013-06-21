@@ -922,7 +922,7 @@ void Slave::generateSlaveId()
     LOG_DEBUG(log, "Generated m_server_id = " << m_server_id);
 }
 
-std::pair<std::string,unsigned int> Slave::getLastBinlog()
+Slave::binlog_pos_t Slave::getLastBinlog() const
 {
 
 
