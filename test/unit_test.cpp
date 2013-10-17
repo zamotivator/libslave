@@ -331,7 +331,8 @@ namespace
         MYSQL_TINYTEXT,
         MYSQL_TEXT,
         MYSQL_DECIMAL,
-        MYSQL_BIT
+        MYSQL_BIT,
+        MYSQL_SET
     };
 
     template <MYSQL_TYPE T>
@@ -401,6 +402,14 @@ namespace
     };
     const std::string MYSQL_type_traits<MYSQL_BIT>::name = "BIT";
 
+    template <>
+    struct MYSQL_type_traits<MYSQL_SET>
+    {
+        typedef slave::types::MY_SET slave_type;
+        static const std::string name;
+    };
+    const std::string MYSQL_type_traits<MYSQL_SET>::name = "SET";
+
     template <typename T>
     void getValue(const std::string& s, T& t)
     {
@@ -424,7 +433,8 @@ namespace
         boost::mpl::int_<MYSQL_TINYTEXT>,
         boost::mpl::int_<MYSQL_TEXT>,
         boost::mpl::int_<MYSQL_DECIMAL>,
-        boost::mpl::int_<MYSQL_BIT>
+        boost::mpl::int_<MYSQL_BIT>,
+        boost::mpl::int_<MYSQL_SET>
     > mysql_one_field_types;
 
     BOOST_AUTO_TEST_CASE_TEMPLATE(test_OneField, T, mysql_one_field_types)
@@ -443,7 +453,10 @@ namespace
             if (line.empty())
                 continue;
             std::vector<std::string> tokens;
-            boost::algorithm::split(tokens, line, boost::algorithm::is_any_of(","), boost::algorithm::token_compress_on);
+            const char* sDelimiters = ",";
+            if ("SET" == type_traits::name)
+                sDelimiters=";";
+            boost::algorithm::split(tokens, line, boost::algorithm::is_any_of(sDelimiters), boost::algorithm::token_compress_on);
             if (tokens.empty())
                 continue;
             if (tokens.front() == "define")
