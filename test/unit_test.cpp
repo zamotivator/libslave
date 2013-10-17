@@ -14,6 +14,7 @@ using namespace boost::unit_test;
 #include <cfloat>
 #include "Slave.h"
 #include "nanomysql.h"
+#include "types.h"
 
 namespace
 {
@@ -339,7 +340,7 @@ namespace
     template <>
     struct MYSQL_type_traits<MYSQL_INT>
     {
-        typedef uint32_t slave_type;
+        typedef slave::types::MY_INT slave_type;
         static const std::string name;
     };
     const std::string MYSQL_type_traits<MYSQL_INT>::name = "INT";
@@ -347,7 +348,7 @@ namespace
     template <>
     struct MYSQL_type_traits<MYSQL_BIGINT>
     {
-        typedef unsigned long long slave_type;
+        typedef slave::types::MY_BIGINT slave_type;
         static const std::string name;
     };
     const std::string MYSQL_type_traits<MYSQL_BIGINT>::name = "BIGINT";
@@ -355,7 +356,7 @@ namespace
     template <>
     struct MYSQL_type_traits<MYSQL_CHAR>
     {
-        typedef std::string slave_type;
+        typedef slave::types::MY_CHAR slave_type;
         static const std::string name;
     };
     const std::string MYSQL_type_traits<MYSQL_CHAR>::name = "CHAR";
@@ -363,7 +364,7 @@ namespace
     template <>
     struct MYSQL_type_traits<MYSQL_VARCHAR>
     {
-        typedef std::string slave_type;
+        typedef slave::types::MY_VARCHAR slave_type;
         static const std::string name;
     };
     const std::string MYSQL_type_traits<MYSQL_VARCHAR>::name = "VARCHAR";
@@ -371,7 +372,7 @@ namespace
     template <>
     struct MYSQL_type_traits<MYSQL_TINYTEXT>
     {
-        typedef std::string slave_type;
+        typedef slave::types::MY_TINYTEXT slave_type;
         static const std::string name;
     };
     const std::string MYSQL_type_traits<MYSQL_TINYTEXT>::name = "TINYTEXT";
@@ -379,7 +380,7 @@ namespace
     template <>
     struct MYSQL_type_traits<MYSQL_TEXT>
     {
-        typedef std::string slave_type;
+        typedef slave::types::MY_TEXT slave_type;
         static const std::string name;
     };
     const std::string MYSQL_type_traits<MYSQL_TEXT>::name = "TEXT";
@@ -387,7 +388,7 @@ namespace
     template <>
     struct MYSQL_type_traits<MYSQL_DECIMAL>
     {
-        typedef double slave_type;
+        typedef slave::types::MY_DECIMAL slave_type;
         static const std::string name;
     };
     const std::string MYSQL_type_traits<MYSQL_DECIMAL>::name = "DECIMAL";
@@ -395,7 +396,7 @@ namespace
     template <>
     struct MYSQL_type_traits<MYSQL_BIT>
     {
-        typedef unsigned long long slave_type;
+        typedef slave::types::MY_BIT slave_type;
         static const std::string name;
     };
     const std::string MYSQL_type_traits<MYSQL_BIT>::name = "BIT";

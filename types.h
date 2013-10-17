@@ -22,7 +22,9 @@ namespace types
     typedef uint32_t            MY_TIME;
     typedef unsigned long long  MY_DATETIME;
     typedef uint32_t            MY_TIMESTAMP;
+    typedef std::string         MY_CHAR;
     typedef std::string         MY_VARCHAR;
+    typedef std::string         MY_TINYTEXT;
     typedef std::string         MY_TEXT;
     typedef std::string         MY_BLOB;
 
