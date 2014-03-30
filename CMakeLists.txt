@@ -11,7 +11,7 @@ ENDIF (CMAKE_COMPILER_IS_GNUCC)
 
 FIND_PACKAGE (Boost REQUIRED)
 INCLUDE_DIRECTORIES (${Boost_INCLUDE_DIRS})
-FIND_PACKAGE (Boost 1.41.0 COMPONENTS unit_test_framework thread)
+FIND_PACKAGE (Boost 1.41.0 COMPONENTS unit_test_framework thread system)
 
 INCLUDE (FindPackageHandleStandardArgs)
 FIND_PATH (IMYSQL mysql/mysql.h)
