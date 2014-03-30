@@ -1,6 +1,10 @@
 INCLUDE_DIRECTORIES ("${CMAKE_SOURCE_DIR}")
+
 ADD_EXECUTABLE (test_client test.cpp)
 TARGET_LINK_LIBRARIES (test_client slave_a -lz -ldl -lpthread)
+
+ADD_EXECUTABLE (db_filler db_filler.cpp)
+TARGET_LINK_LIBRARIES (db_filler slave_a -lz -ldl -lpthread)
 
 IF (Boost_FOUND)
     ADD_DEFINITIONS (-std=c++0x)
