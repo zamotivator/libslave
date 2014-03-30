@@ -118,6 +118,7 @@ int main(int argc, char** argv) {
 
         case 'd':
             database = optarg;
+            break;
 
         case 'P':
             port = ::atoi(optarg);
