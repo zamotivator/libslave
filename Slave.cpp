@@ -931,7 +931,8 @@ Slave::binlog_pos_t Slave::getLastBinlog() const
 
     nanomysql::Connection::result_t res;
 
-    conn.query("SHOW MASTER STATUS");
+    static const std::string query = "SHOW MASTER STATUS";
+    conn.query(query);
     conn.store(res);
 
     if (res.size() == 1 && res[0].size() == 4) {
@@ -939,19 +940,19 @@ Slave::binlog_pos_t Slave::getLastBinlog() const
         std::map<std::string,nanomysql::field>::const_iterator z = res[0].find("File");
 
         if (z == res[0].end())
-            throw std::runtime_error("Slave::create_table(): SHOW SLAVE HOSTS query did not return 'File'");
+            throw std::runtime_error("Slave::create_table(): " + query + " query did not return 'File'");
 
         std::string file = z->second.data;
 
         z = res[0].find("Position");
 
         if (z == res[0].end())
-            throw std::runtime_error("Slave::create_table(): SHOW SLAVE HOSTS query did not return 'Position'");
+            throw std::runtime_error("Slave::create_table(): " + query + " query did not return 'Position'");
 
         std::string pos = z->second.data;
 
         return std::make_pair(file, ::strtoul(pos.c_str(), NULL, 10));
     }
 
-    throw std::runtime_error("Slave::getLastBinLog(): Could not SHOW MASTER STATUS");
+    throw std::runtime_error("Slave::getLastBinLog(): Could not " + query);
 }
