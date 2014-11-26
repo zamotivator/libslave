@@ -14,6 +14,7 @@
 
 
 #include <cstdio>
+#include <inttypes.h>
 #include <vector>
 #include <stdexcept>                                                                                                                
 #include <mysql/my_global.h>
@@ -461,8 +462,8 @@ Field_bit::Field_bit(const std::string& field_name_arg, const std::string& type)
 
 const char* Field_bit::unpack(const char *from)
 {
-    uint64 value = 0ULL;
-    
+    uint64_t value = 0;
+
     for (const char *b = from, *e = from + _pack_length; b < e; ++b)
     {
         value <<= 8;
