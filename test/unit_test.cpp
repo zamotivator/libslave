@@ -308,6 +308,30 @@ namespace
             if (!sCallback.fail_reason.empty())
                 BOOST_ERROR(sCallback.fail_reason << "\n" << aErrorMsg);
         }
+
+        template<typename T>
+        struct Line
+        {
+            std::string type;
+            std::string filename;
+            std::string line;
+            size_t      lineNumber;
+            std::string insert;
+            T           expected;
+        };
+
+        template<typename T> void oneFieldTest(boost::shared_ptr<nanomysql::Connection>& conn, std::vector<Line<T>>& data)
+        {
+            for (Line<T>& c : data)
+            {
+                const std::string sDropTableQuery = "DROP TABLE IF EXISTS test";
+                conn->query(sDropTableQuery);
+                const std::string sCreateTableQuery = "CREATE TABLE test (value " + c.type + ") DEFAULT CHARSET=utf8";
+                conn->query(sCreateTableQuery);
+                std::string sErrorMessage = "(we are now on file '" + c.filename + "' line " + std::to_string(c.lineNumber) + ": '" + c.line + "')";
+                checkInsertValue<T>(c.expected, c.insert, sErrorMessage);
+            }
+        }
     };
 
     BOOST_AUTO_TEST_SUITE(SlaveConf)
@@ -447,6 +471,8 @@ namespace
         BOOST_REQUIRE_MESSAGE(f, "Cannot open file with data: '" << sDataFilename << "'");
         std::string line;
         size_t line_num = 0;
+        std::vector<Line<slave_type>> data;
+        std::string type;
         while (getline(f, line))
         {
             ++line_num;
@@ -472,10 +498,9 @@ namespace
                 }
                 if (tokens.size() != 2)
                     BOOST_FAIL("Malformed string '" << line << "' in the file '" << sDataFilename << "'");
-                const std::string sDropTableQuery = "DROP TABLE IF EXISTS test";
-                conn->query(sDropTableQuery);
-                const std::string sCreateTableQuery = "CREATE TABLE test (value " + tokens[1] + ") DEFAULT CHARSET=utf8";
-                conn->query(sCreateTableQuery);
+                type = tokens[1];
+                oneFieldTest(conn, data);
+                data.clear();
             }
             else if (tokens.front() == "data")
             {
@@ -486,13 +511,22 @@ namespace
                 slave_type checked_value;
                 getValue(tokens[2], checked_value);
 
-                checkInsertValue(checked_value, tokens[1], "(we are now on file '" + sDataFilename + "' line " + std::to_string(line_num) + ": '" + line + "')");
+                Line<slave_type> current;
+                current.type = type;
+                current.filename = sDataFilename;
+                current.line = line;
+                current.lineNumber = line_num;
+                current.insert = tokens[1];
+                current.expected = checked_value;
+                data.push_back(current);
             }
             else if (tokens.front()[0] == ';')
                 continue;   // комментарий
             else
                 BOOST_FAIL("Unknown command '" << tokens.front() << "' in the file '" << sDataFilename << "' on line " << line_num);
         }
+        oneFieldTest(conn, data);
+        data.clear();
     }
 
     // Проверяем, что если останавливаем слейв, он в дальнейшем продолжит читать с той же позиции
