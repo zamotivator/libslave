@@ -261,21 +261,55 @@ namespace
                 data.emplace_back(std::make_pair(extract(rs.m_old_row), extract(rs.m_row)));
             }
 
-            void checkInsert(const T& t, const std::string& aErrorMsg) const
+            static void expectNothing(const Row& row, const std::string& name,
+                                      const std::string& aErrorMessage)
+            {
+                if (row)
+                    BOOST_ERROR("Has " << name << " image with '" << row.get()
+                                << "' value, expected nothing during" << aErrorMessage);
+            }
+
+            static void expectValue(const T& value, const Row& row, const std::string& name,
+                                    const std::string& aErrorMessage)
+            {
+                if (!row)
+                    BOOST_ERROR("Has not " << name << " image, expected '" << value << "' during" << aErrorMessage);
+                if (not_equal(row.get(), value))
+                    BOOST_ERROR("Has invalid " << name << " image with '" << row.get() << "'"
+                                << "while expected '"<< value << "' during " << aErrorMessage);
+            }
+
+            void checkInsert(const T& t, const std::string& aErrorMessage) const
             {
                 if (data.size() != 1)
-                    BOOST_ERROR ("Have invalid call count: " << data.size() << " for " << aErrorMsg);
+                    BOOST_ERROR ("Have invalid call count: " << data.size() << " for " << aErrorMessage);
                 const auto& pair = data.front();
-                if (pair.first)
-                    BOOST_ERROR("Has before image for insert: '" << pair.first.get()
-                                << "' while has expecting nothing during" << aErrorMsg);
-                if (!pair.second)
-                    BOOST_ERROR("Has not after image for insert while has expecting: '" << t
-                                << "' during " << aErrorMsg);
-                if (not_equal(pair.second.get(), t))
-                    BOOST_ERROR("Has invalid image for insert: '" << pair.first.get()
-                                << "' while has expecting: '" << t
-                                << "' during " << aErrorMsg);
+                expectNothing(pair.first, "BEFORE", aErrorMessage);
+                expectValue(t, pair.second, "AFTER", aErrorMessage);
+            }
+
+            void checkUpdate(const T& was, const T& now, const std::string& aErrorMessage) const
+            {
+                if (data.size() != 1)
+                    BOOST_ERROR ("Have invalid call count: " << data.size() << " for " << aErrorMessage);
+                const auto& pair = data.front();
+                expectValue(was, pair.first, "BEFORE", aErrorMessage);
+                expectValue(now, pair.second, "AFTER", aErrorMessage);
+            }
+
+            void checkDelete(const T& was, const std::string& aErrorMessage) const
+            {
+                if (data.size() != 1)
+                    BOOST_ERROR ("Have invalid call count: " << data.size() << " for " << aErrorMessage);
+                const auto& pair = data.front();
+                expectValue(was, pair.first, "BEFORE", aErrorMessage);
+                expectNothing(pair.second, "AFTER", aErrorMessage);
+            }
+
+            void checkNothing(const std::string& aErrorMessage)
+            {
+                if (!data.empty())
+                    BOOST_ERROR ("Have invalid call count: " << data.size() << " for " << aErrorMessage);
             }
 
             bool waitCall(const std::string& aErrorMessage, const uint32_t aTimeoutSeconds) const
@@ -294,7 +328,7 @@ namespace
         };
 
         template<typename T, typename F>
-        void check(F f, const std::string& aQuery, const std::string& aErrorMsg)
+        void check(F f, const std::string& aQuery, const std::string& aErrorMsg, const slave::EventKind kind = slave::eAll)
         {
             // Устанавливаем в libslave колбек для проверки этого значения
             Collector<T> sCallback;
@@ -316,14 +350,6 @@ namespace
             m_Callback.setCallback();
         }
 
-        template <typename T>
-        void checkInsertValue(T t, const std::string& aInsertString, const std::string& aErrorMsg)
-        {
-            check<T>([&t, &aErrorMsg](const Collector<T>& collector)
-                     { collector.checkInsert(t, aErrorMsg); },
-                     "INSERT INTO test VALUES (" + aInsertString + ")", aErrorMsg);
-        }
-
         template<typename T>
         struct Line
         {
@@ -335,6 +361,32 @@ namespace
             T           expected;
         };
 
+        template<typename T> static std::string errorMessage(const Line<T>& c)
+        {
+            return "(we are now on file '" + c.filename + "' line " + std::to_string(c.lineNumber) + ": '" + c.line + "')";
+        }
+
+        template <typename T>
+        void checkInsertValue(T t, const std::string& aValue, const std::string& aErrorMessage)
+        {
+            check<T>([&t, &aErrorMessage](const Collector<T>& collector)
+                     { collector.checkInsert(t, aErrorMessage); },
+                     "INSERT INTO test VALUES (" + aValue + ")", aErrorMessage);
+        }
+
+        template<typename T> void checkInsert(const Line<T>& line)
+        {
+            checkInsertValue<T>(line.expected, line.insert, errorMessage(line));
+        }
+
+        template<typename T>
+        void checkUpdate(Line<T> was, Line<T> now)
+        {
+            check<T>([&was, &now](const Collector<T>& collector)
+                     { collector.checkUpdate(was.expected, now.expected, errorMessage(now)); },
+                     "UPDATE test SET value=" + now.insert + ") WHERE value=" + was.insert, errorMessage(now));
+        }
+
         template<typename T> void recreate(boost::shared_ptr<nanomysql::Connection>& conn,
                                            const Line<T>& c)
         {
@@ -342,11 +394,6 @@ namespace
             conn->query(sDropTableQuery);
             const std::string sCreateTableQuery = "CREATE TABLE test (value " + c.type + ") DEFAULT CHARSET=utf8";
             conn->query(sCreateTableQuery);
-        }
-
-        template<typename T> std::string errorMessage(const Line<T>& c)
-        {
-            return "(we are now on file '" + c.filename + "' line " + std::to_string(c.lineNumber) + ": '" + c.line + "')";
         }
 
         template<typename T> void testInsert(boost::shared_ptr<nanomysql::Connection>& conn,
@@ -364,6 +411,17 @@ namespace
                                              const std::vector<Line<T>>& data,
                                              slave::EventKind flag)
         {
+            for (std::size_t i = 0; i < data.size(); ++i)
+                if (i == 0)
+                {
+                    recreate(conn, data[0]);
+                    checkInsert<T>(data[0]);
+                }
+                else
+                {
+                    //checkUpdate<T>(data[i-1], data[i]);
+                }
+            //checkUpdate<T>(data.back(), data.front());
         }
 
         template<typename T> void testDelete(boost::shared_ptr<nanomysql::Connection>& conn,
