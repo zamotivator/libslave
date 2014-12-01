@@ -281,49 +281,6 @@ namespace
             bool wasCalls() const { return !data.empty(); }
         };
 
-        /*template <typename T>
-        struct CheckEquality
-        {
-            T value;
-            Atomic<int> counter;
-            std::string fail_reason;
-
-            CheckEquality(const T& t) : value(t), counter(0) {}
-
-            void operator() (const slave::RecordSet& rs)
-            {
-                try
-                {
-                    if (++counter > 1)
-                        throw std::runtime_error("Second call on CheckEquality");
-                    const slave::Row& row = rs.m_row;
-                    if (row.size() > 1)
-                    {
-                        std::ostringstream str;
-                        str << "Row size is " << row.size();
-                        throw std::runtime_error(str.str());
-                    }
-                    const slave::Row::const_iterator it = row.find("value");
-                    if (row.end() == it)
-                        throw std::runtime_error("Can't find field 'value' in the row");
-                    const T t = boost::any_cast<T>(it->second.second);
-                    //if (value != t)
-                    if (not_equal(value,t))
-                    {
-                        std::ostringstream str;
-                        str << "Value '" << value << "' is not equal to libslave value '" << t << "'";
-                        throw std::runtime_error(str.str());
-                    }
-
-                }
-                catch (const std::exception& ex)
-                {
-                    fail_reason += '\n';
-                    fail_reason += ex.what();
-                }
-            }
-        };*/
-
         template<typename CheckF> void wait(CheckF f, const std::string& aErrorMsg,
                                             const uint32_t aTimeoutSeconds = 1)
         {
