@@ -260,9 +260,28 @@ namespace
             {
                 data.emplace_back(std::make_pair(extract(rs.m_old_row), extract(rs.m_row)));
             }
+
+            void checkInsert(const T& t, const std::string& aErrorMsg) const
+            {
+                if (data.size() != 1)
+                    BOOST_ERROR ("Have invalid call count: " << data.size() << " for " << aErrorMsg);
+                const auto& pair = data.front();
+                if (pair.first)
+                    BOOST_ERROR("Has before image for insert: '" << pair.first.get()
+                                << "' while has expecting nothing during" << aErrorMsg);
+                if (!pair.second)
+                    BOOST_ERROR("Has not after image for insert while has expecting: '" << t
+                                << "' during " << aErrorMsg);
+                if (not_equal(pair.second.get(), t))
+                    BOOST_ERROR("Has invalid image for insert: '" << pair.first.get()
+                                << "' while has expecting: '" << t
+                                << "' during " << aErrorMsg);
+            }
+
+            bool wasCalls() const { return !data.empty(); }
         };
 
-        template <typename T>
+        /*template <typename T>
         struct CheckEquality
         {
             T value;
@@ -303,13 +322,14 @@ namespace
                     fail_reason += ex.what();
                 }
             }
-        };
+        };*/
 
-        template<typename CheckF> void wait(CheckF f, const std::string& aErrorMsg)
+        template<typename CheckF> void wait(CheckF f, const std::string& aErrorMsg,
+                                            const uint32_t aTimeoutSeconds = 1)
         {
             const timespec ts = {0 , 1000000};
             size_t i = 0;
-            for (; i < 1000; ++i)
+            for (; i < 1000 * aTimeoutSeconds; ++i)
             {
                 ::nanosleep(&ts, NULL);
                 if (f())
@@ -333,9 +353,9 @@ namespace
             conn->query(aQuery);
 
             // Ждем отработки колбека максимум 1 секунду
-            wait([&sCallback](){ return !sCallback.data.empty(); }, aErrorMsg);
+            wait([&sCallback](){ return sCallback.wasCalls(); }, aErrorMsg);
 
-            f(sCallback.data);
+            f(sCallback);
 
             // Убираем наш колбек, т.к. он при выходе из блока уничтожится, заодно чтобы
             // строку он не мучал больше, пока мы ее проверяем
@@ -345,22 +365,9 @@ namespace
         template <typename T>
         void checkInsertValue(T t, const std::string& aInsertString, const std::string& aErrorMsg)
         {
-            check<T>([&t, &aErrorMsg](const typename Collector<T>::EventVector& data)
-            {
-                if (data.size() != 1)
-                    BOOST_ERROR ("Have invalid call count: " << data.size() << " for " << aErrorMsg);
-                const auto& pair = data.front();
-                if (pair.first)
-                    BOOST_ERROR("Has before image for insert: '" << pair.first.get()
-                                << "' while has expecting nothing during" << aErrorMsg);
-                if (!pair.second)
-                    BOOST_ERROR("Has not after image for insert while has expecting: '" << t
-                                << "' during " << aErrorMsg);
-                if (not_equal(pair.second.get(), t))
-                    BOOST_ERROR("Has invalid image for insert: '" << pair.first.get()
-                                << "' while has expecting: '" << t
-                                << "' during " << aErrorMsg);
-            }, "INSERT INTO test VALUES (" + aInsertString + ")", aErrorMsg);
+            check<T>([&t, &aErrorMsg](const Collector<T>& collector)
+                     { collector.checkInsert(t, aErrorMsg); },
+                     "INSERT INTO test VALUES (" + aInsertString + ")", aErrorMsg);
         }
 
         template<typename T>
@@ -644,29 +651,18 @@ namespace
 
         conn->query("INSERT INTO test VALUES (345234)");
 
-        CheckEquality<uint32_t> sCallback(345234);
+        Collector<uint32_t> sCallback;
         m_Callback.setCallback(std::ref(sCallback));
 
         startSlave();
 
-        // Ждем отработки колбека максимум 1 секунду
-        const timespec ts = {0 , 1000000};
-        size_t i = 0;
-        for (; i < 1000; ++i)
-        {
-            ::nanosleep(&ts, NULL);
-            if (sCallback.counter >= 1)
-                break;
-        }
-        if (sCallback.counter < 1)
-            BOOST_ERROR ("Have no calls to libslave callback for 1 second");
+        auto sErrorMessage = "start/stop test";
+        wait([&sCallback](){ return sCallback.wasCalls(); }, sErrorMessage);
+        sCallback.checkInsert(345234, sErrorMessage);
 
         // Убираем наш колбек, т.к. он при выходе из блока уничтожится, заодно чтобы
         // строку он не мучал больше, пока мы ее проверяем
         m_Callback.setCallback();
-
-        if (!sCallback.fail_reason.empty())
-            BOOST_ERROR(sCallback.fail_reason << "\n");
 
         // Проверяем, что не было нежелательных вызовов до этого
         if (0 != m_Callback.m_UnwantedCalls)
@@ -782,27 +778,17 @@ namespace
 
         conn->query("INSERT INTO test VALUES (345234)");
 
-        CheckEquality<uint32_t> sCallback(345234);
+        Collector<uint32_t> sCallback;
         m_Callback.setCallback(std::ref(sCallback));
 
         // Ждем отработки колбека максимум 2 секунды (потому что одну спит колбек перед реконнектом)
-        const timespec ts = {0 , 1000000};
-        size_t i = 0;
-        for (; i < 2000; ++i)
-        {
-            ::nanosleep(&ts, NULL);
-            if (sCallback.counter >= 1)
-                break;
-        }
-        if (sCallback.counter < 1)
-            BOOST_ERROR ("Have no calls to libslave callback for 2 seconds");
+        auto sErrorMessage = "disconnect test";
+        wait([&sCallback](){ return sCallback.wasCalls(); }, sErrorMessage, 2);
+        sCallback.checkInsert(345234, sErrorMessage);
 
         // Убираем наш колбек, т.к. он при выходе из блока уничтожится, заодно чтобы
         // строку он не мучал больше, пока мы ее проверяем
         m_Callback.setCallback();
-
-        if (!sCallback.fail_reason.empty())
-            BOOST_ERROR(sCallback.fail_reason << "\n");
 
         // Проверяем, что не было нежелательных вызовов до этого
         if (0 != m_Callback.m_UnwantedCalls)
