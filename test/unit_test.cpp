@@ -233,6 +233,35 @@ namespace
             stopSlave();
         }
 
+        template<typename T>
+        struct Collector
+        {
+            typedef boost::optional<T> Row;
+            typedef std::pair<Row, Row> Event;
+            typedef std::vector<Event> EventVector;
+            EventVector data;
+
+            static Row extract(const slave::Row& row)
+            {
+                if (row.size() > 1)
+                {
+                    std::ostringstream str;
+                    str << "Row size is " << row.size();
+                    throw std::runtime_error(str.str());
+                }
+                const slave::Row::const_iterator it = row.find("value");
+                if (row.end() != it)
+                    return boost::any_cast<T>(it->second.second);
+                else
+                    return Row();
+            }
+
+            void operator()(const slave::RecordSet& rs)
+            {
+                data.emplace_back(std::make_pair(extract(rs.m_old_row), extract(rs.m_row)));
+            }
+        };
+
         template <typename T>
         struct CheckEquality
         {
@@ -266,6 +295,7 @@ namespace
                         str << "Value '" << value << "' is not equal to libslave value '" << t << "'";
                         throw std::runtime_error(str.str());
                     }
+
                 }
                 catch (const std::exception& ex)
                 {
@@ -275,38 +305,62 @@ namespace
             }
         };
 
-        template <typename T>
-        void checkInsertValue(T t, const std::string& aInsertString, const std::string& aErrorMsg)
+        template<typename CheckF> void wait(CheckF f, const std::string& aErrorMsg)
         {
-            // Устанавливаем в libslave колбек для проверки этого значения
-            CheckEquality<T> sCallback(t);
-            m_Callback.setCallback(std::ref(sCallback));
-            // Проверяем, что не было нежелательных вызовов до этого
-            if (0 != m_Callback.m_UnwantedCalls)
-                BOOST_ERROR("Unwanted calls before this case: " << m_Callback.m_UnwantedCalls << aErrorMsg);
-
-            // Всталяем значение в таблицу
-            const std::string sInsertValueQuery = "INSERT INTO test VALUES (" + aInsertString + ")";
-            conn->query(sInsertValueQuery);
-
-            // Ждем отработки колбека максимум 1 секунду
             const timespec ts = {0 , 1000000};
             size_t i = 0;
             for (; i < 1000; ++i)
             {
                 ::nanosleep(&ts, NULL);
-                if (sCallback.counter >= 1)
+                if (f())
                     break;
             }
-            if (sCallback.counter < 1)
+            if (!f())
                 BOOST_ERROR ("Have no calls to libslave callback for 1 second: " << aErrorMsg);
+        }
+
+        template<typename T, typename F>
+        void check(F f, const std::string& aQuery, const std::string& aErrorMsg)
+        {
+            // Устанавливаем в libslave колбек для проверки этого значения
+            Collector<T> sCallback;
+            m_Callback.setCallback(std::ref(sCallback));
+            // Проверяем, что не было нежелательных вызовов до этого
+            if (0 != m_Callback.m_UnwantedCalls)
+                BOOST_ERROR("Unwanted calls before this case: " << m_Callback.m_UnwantedCalls << aErrorMsg);
+
+            // Модифицируем таблицу
+            conn->query(aQuery);
+
+            // Ждем отработки колбека максимум 1 секунду
+            wait([&sCallback](){ return !sCallback.data.empty(); }, aErrorMsg);
+
+            f(sCallback.data);
 
             // Убираем наш колбек, т.к. он при выходе из блока уничтожится, заодно чтобы
             // строку он не мучал больше, пока мы ее проверяем
             m_Callback.setCallback();
+        }
 
-            if (!sCallback.fail_reason.empty())
-                BOOST_ERROR(sCallback.fail_reason << "\n" << aErrorMsg);
+        template <typename T>
+        void checkInsertValue(T t, const std::string& aInsertString, const std::string& aErrorMsg)
+        {
+            check<T>([&t, &aErrorMsg](const typename Collector<T>::EventVector& data)
+            {
+                if (data.size() != 1)
+                    BOOST_ERROR ("Have invalid call count: " << data.size() << " for " << aErrorMsg);
+                const auto& pair = data.front();
+                if (pair.first)
+                    BOOST_ERROR("Has before image for insert: '" << pair.first.get()
+                                << "' while has expecting nothing during" << aErrorMsg);
+                if (!pair.second)
+                    BOOST_ERROR("Has not after image for insert while has expecting: '" << t
+                                << "' during " << aErrorMsg);
+                if (not_equal(pair.second.get(), t))
+                    BOOST_ERROR("Has invalid image for insert: '" << pair.first.get()
+                                << "' while has expecting: '" << t
+                                << "' during " << aErrorMsg);
+            }, "INSERT INTO test VALUES (" + aInsertString + ")", aErrorMsg);
         }
 
         template<typename T>
@@ -320,17 +374,65 @@ namespace
             T           expected;
         };
 
-        template<typename T> void oneFieldTest(boost::shared_ptr<nanomysql::Connection>& conn, std::vector<Line<T>>& data)
+        template<typename T> void recreate(boost::shared_ptr<nanomysql::Connection>& conn,
+                                           const Line<T>& c)
         {
-            for (Line<T>& c : data)
+            const std::string sDropTableQuery = "DROP TABLE IF EXISTS test";
+            conn->query(sDropTableQuery);
+            const std::string sCreateTableQuery = "CREATE TABLE test (value " + c.type + ") DEFAULT CHARSET=utf8";
+            conn->query(sCreateTableQuery);
+        }
+
+        template<typename T> std::string errorMessage(const Line<T>& c)
+        {
+            return "(we are now on file '" + c.filename + "' line " + std::to_string(c.lineNumber) + ": '" + c.line + "')";
+        }
+
+        template<typename T> void testInsert(boost::shared_ptr<nanomysql::Connection>& conn,
+                                             const std::vector<Line<T>>& data,
+                                             slave::EventKind flag)
+        {
+            for (const Line<T>& c : data)
             {
-                const std::string sDropTableQuery = "DROP TABLE IF EXISTS test";
-                conn->query(sDropTableQuery);
-                const std::string sCreateTableQuery = "CREATE TABLE test (value " + c.type + ") DEFAULT CHARSET=utf8";
-                conn->query(sCreateTableQuery);
-                std::string sErrorMessage = "(we are now on file '" + c.filename + "' line " + std::to_string(c.lineNumber) + ": '" + c.line + "')";
-                checkInsertValue<T>(c.expected, c.insert, sErrorMessage);
+                recreate(conn, c);
+                checkInsertValue<T>(c.expected, c.insert, errorMessage(c));
             }
+        }
+
+        template<typename T> void testUpdate(boost::shared_ptr<nanomysql::Connection>& conn,
+                                             const std::vector<Line<T>>& data,
+                                             slave::EventKind flag)
+        {
+        }
+
+        template<typename T> void testDelete(boost::shared_ptr<nanomysql::Connection>& conn,
+                                             const std::vector<Line<T>>& data,
+                                             slave::EventKind flag)
+        {
+        }
+
+        template<typename T> void testAll(boost::shared_ptr<nanomysql::Connection>& conn,
+                                          const std::vector<Line<T>>& data,
+                                          slave::EventKind flag)
+        {
+            testInsert(conn, data, flag);
+            testUpdate(conn, data, flag);
+            testDelete(conn, data, flag);
+        }
+
+        template<typename T> void testAll(boost::shared_ptr<nanomysql::Connection>& conn,
+                                          const std::vector<Line<T>>& data)
+        {
+            if (data.empty())
+                return;
+            testAll(conn, data, slave::eAll);
+            testAll(conn, data, slave::eInsert);
+            testAll(conn, data, slave::eUpdate);
+            testAll(conn, data, slave::eDelete);
+            testAll(conn, data, static_cast<slave::EventKind>(~static_cast<uint8_t>(slave::eInsert)));
+            testAll(conn, data, static_cast<slave::EventKind>(~static_cast<uint8_t>(slave::eUpdate)));
+            testAll(conn, data, static_cast<slave::EventKind>(~static_cast<uint8_t>(slave::eDelete)));
+            testAll(conn, data, slave::eNone);
         }
     };
 
@@ -499,7 +601,7 @@ namespace
                 if (tokens.size() != 2)
                     BOOST_FAIL("Malformed string '" << line << "' in the file '" << sDataFilename << "'");
                 type = tokens[1];
-                oneFieldTest(conn, data);
+                testAll(conn, data);
                 data.clear();
             }
             else if (tokens.front() == "data")
@@ -525,7 +627,7 @@ namespace
             else
                 BOOST_FAIL("Unknown command '" << tokens.front() << "' in the file '" << sDataFilename << "' on line " << line_num);
         }
-        oneFieldTest(conn, data);
+        testAll(conn, data);
         data.clear();
     }
 
