@@ -278,23 +278,20 @@ namespace
                                 << "' during " << aErrorMsg);
             }
 
-            bool wasCalls() const { return !data.empty(); }
-        };
-
-        template<typename CheckF> void wait(CheckF f, const std::string& aErrorMsg,
-                                            const uint32_t aTimeoutSeconds = 1)
-        {
-            const timespec ts = {0 , 1000000};
-            size_t i = 0;
-            for (; i < 1000 * aTimeoutSeconds; ++i)
+            bool waitCall(const std::string& aErrorMessage, const uint32_t aTimeoutSeconds) const
             {
-                ::nanosleep(&ts, NULL);
-                if (f())
-                    break;
+                const timespec ts = {0 , 1000000};
+                size_t i = 0;
+                for (; i < 1000 * aTimeoutSeconds; ++i)
+                {
+                    ::nanosleep(&ts, NULL);
+                    if (!data.empty())
+                        break;
+                }
+                if (data.empty())
+                    BOOST_ERROR ("Have no calls to libslave callback for 1 second: " << aErrorMessage);
             }
-            if (!f())
-                BOOST_ERROR ("Have no calls to libslave callback for 1 second: " << aErrorMsg);
-        }
+        };
 
         template<typename T, typename F>
         void check(F f, const std::string& aQuery, const std::string& aErrorMsg)
@@ -310,7 +307,7 @@ namespace
             conn->query(aQuery);
 
             // Ждем отработки колбека максимум 1 секунду
-            wait([&sCallback](){ return sCallback.wasCalls(); }, aErrorMsg);
+            sCallback.waitCall(aErrorMsg, 1);
 
             f(sCallback);
 
@@ -614,7 +611,7 @@ namespace
         startSlave();
 
         auto sErrorMessage = "start/stop test";
-        wait([&sCallback](){ return sCallback.wasCalls(); }, sErrorMessage);
+        sCallback.waitCall(sErrorMessage, 1);
         sCallback.checkInsert(345234, sErrorMessage);
 
         // Убираем наш колбек, т.к. он при выходе из блока уничтожится, заодно чтобы
@@ -740,7 +737,7 @@ namespace
 
         // Ждем отработки колбека максимум 2 секунды (потому что одну спит колбек перед реконнектом)
         auto sErrorMessage = "disconnect test";
-        wait([&sCallback](){ return sCallback.wasCalls(); }, sErrorMessage, 2);
+        sCallback.waitCall(sErrorMessage, 2);
         sCallback.checkInsert(345234, sErrorMessage);
 
         // Убираем наш колбек, т.к. он при выходе из блока уничтожится, заодно чтобы
